@@ -23,6 +23,7 @@ from nipype.interfaces.base import (
     BaseInterface,
 )
 import shutil
+import glob
 
 class DHCPInputSpec(BaseInterfaceInputSpec):
     """
@@ -79,6 +80,10 @@ class DHCPOutputSpec(TraitedSpec):
 
     output_seg_all_labels = File(
         exists=True, desc="Output segmentation of all labels"
+    )
+
+    output_surf_wb_spec = File(
+        exists=True, desc="Output surface workbench spec"
     )
 
 class dhcp_node(BaseInterface):
@@ -160,4 +165,10 @@ class dhcp_node(BaseInterface):
     def _list_outputs(self):
         outputs = {}
         outputs["output_dir"] = os.path.abspath("dhcp_output")
+        outputs["output_seg_all_labels"] = glob.glob(os.path.abspath(
+            "dhcp_output/segmentations/*_all_labels.nii.gz"
+        ))[0]
+        outputs["output_surf_wb_spec"] = glob.glob(os.path.abspath(
+            "dhcp_output/surfaces/*/workbench/*.native.wb.spec"
+        ))[0]
         return outputs
