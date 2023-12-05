@@ -457,9 +457,15 @@ def create_dhcp_subpipe(name="dhcp_pipe", params={}):
 
     # OUTPUT
     outputnode = pe.Node(
-        niu.IdentityInterface(fields=["output_dir"]), name="outputnode"
+        niu.IdentityInterface(fields=["output_dir", "output_seg_all_labels", "output_surf_wb_spec"]), name="outputnode"
     )
 
     full_fet_pipe.connect(dhcp_seg, "output_dir", outputnode, "output_dir")
+    full_fet_pipe.connect(
+        dhcp_seg, "output_seg_all_labels", outputnode, "output_seg_all_labels"
+    )
+    full_fet_pipe.connect(
+        dhcp_seg, "output_surf_wb_spec", outputnode, "output_surf_wb_spec"
+    )
 
     return full_fet_pipe
