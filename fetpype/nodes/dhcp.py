@@ -155,10 +155,37 @@ class dhcp_node(BaseInterface):
                 "pre_command must either contain docker or singularity."
             )
 
-        # Add code here to execute the dhcp pipeline using the cmd variable
+        # Check if the output files exist
+        # if not, rerun the pipeline directly here
+        segmentation = os.path.join(
+            output_dir,
+            "segmentations",
+            f"{recon_file_name.replace('.nii.gz', '')}_all_labels.nii.gz",
+        )
 
-        print(cmd)
-        # os.system(cmd)
+        surface = os.path.join(
+            output_dir,
+            "surfaces",
+            f"{recon_file_name.replace('.nii.gz', '')}_all_labels",
+            "workbench",
+            f"{recon_file_name.replace('.nii.gz', '')}_all_labels.native.wb.spec",
+        )
+
+        # depending on inputs.flag, we will check for different files
+        if self.inputs.flag in ["-all", "surf"]:
+            file_to_check = surface
+        else:
+            file_to_check = segmentation
+
+        max_tries = 10
+        tries = 0
+
+        while not os.path.exists(file_to_check) and tries < max_tries:
+            print("Running dhcp pipeline")
+            print("Try number: ", tries)
+            print(cmd)
+            os.system(cmd)
+            tries += 1
 
         return runtime
 
