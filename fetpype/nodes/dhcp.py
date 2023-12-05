@@ -81,7 +81,6 @@ class DHCPOutputSpec(TraitedSpec):
         exists=True, desc="Output segmentation of all labels"
     )
 
-    output_surf_
 class dhcp_node(BaseInterface):
     """Run the dhcp segmentation pipeline on a single subject.
     The script needs to create the output folders and put the mask
