@@ -16,7 +16,9 @@ from ..nodes.preprocessing import (
     niftymic_brain_extraction,
     CropStacksAndMasks,
 )
-from ..nodes.dhcp import dhcp_pipeline
+
+# from ..nodes.dhcp import dhcp_pipeline
+from ..nodes.dhcp import dhcp_node
 
 # from nipype import config
 # config.enable_debug_mode()
@@ -435,23 +437,8 @@ def create_dhcp_subpipe(name="dhcp_pipe", params={}):
         flag = "-all"
 
     # PREPROCESSING
-    # 1. Run the dhcp pipeline for segmentation
-    dhcp_seg = pe.Node(
-        interface=niu.Function(
-            input_names=[
-                "T2",
-                "mask",
-                "gestational_age",
-                "pre_command",
-                "dhcp_image",
-                "threads",
-                "flag",
-            ],
-            output_names=["dhcp_files"],
-            function=dhcp_pipeline,
-        ),
-        name="dhcp_seg",
-    )
+    # Load the node from dhcp_node, and connect it to the pipeline
+    dhcp_seg = pe.Node(dhcp_node(), name="dhcp_seg")
 
     if "general" in params.keys():
         dhcp_seg.inputs.pre_command = params["general"].get("pre_command", "")
@@ -470,114 +457,9 @@ def create_dhcp_subpipe(name="dhcp_pipe", params={}):
 
     # OUTPUT
     outputnode = pe.Node(
-        niu.IdentityInterface(fields=["dhcp_files"]), name="outputnode"
+        niu.IdentityInterface(fields=["output_dir"]), name="outputnode"
     )
 
-    full_fet_pipe.connect(dhcp_seg, "dhcp_files", outputnode, "dhcp_files")
-
-    return full_fet_pipe
-
-
-def create_dhcp_subpipe(name="dhcp_pipe", params={}):
-    """
-    Create a dhcp pipeline for segmentation of fetal MRI
-
-    Given an reconstruction of fetal MRI and a mask, this
-    pipeline performs the following steps:
-        1. Run the dhcp pipeline for segmentation
-        2. Run it for surface extraction
-
-    Params:
-        name:
-            pipeline name (default = "full_fet_pipe")
-        params:
-            dictionary of parameters (default = {}). This
-            dictionary contains the parameters given in a JSON
-            config file. It specifies which containers to use
-            for each step of the pipeline.
-
-    Inputs:
-        inputnode:
-            MRI brain:
-                Reconstruction of MRI brain
-            Mask:
-                Corresponding brain mask of the reconstruction
-            GA:
-                gestational age of the fetus
-    Outputs:
-        outputnode:
-            dhcp_files:
-                folder with dhcp outputs
-
-    TODO:
-    - EM algorithm halting, solve it better or in the messy way?
-    """
-
-    print("Full pipeline name: ", name)
-
-    # Creating pipeline
-    full_fet_pipe = pe.Workflow(name=name)
-
-    # Creating input node
-    inputnode = pe.Node(
-        niu.IdentityInterface(fields=["T2", "mask", "gestational_age"]),
-        name="inputnode",
-    )
-
-    # Check params to see if we need to run the seg or surf part, or both.
-    # Params to look is [dhcp][seg] and [dhcp][surf]
-    flag = None
-    if "dhcp" in params.keys():
-        if params["dhcp"]["surf"] and params["dhcp"]["seg"]:
-            flag = "-all"
-        elif params["dhcp"]["seg"]:
-            flag = "-seg"
-        elif params["dhcp"]["surf"]:
-            flag = "-surf"
-
-    else:
-        print("No dhcp parameters found, running both seg and surf")
-        flag = "-all"
-
-    # PREPROCESSING
-    # 1. Run the dhcp pipeline for segmentation
-    dhcp_seg = pe.Node(
-        interface=niu.Function(
-            input_names=[
-                "T2",
-                "mask",
-                "gestational_age",
-                "pre_command",
-                "dhcp_image",
-                "threads",
-                "flag",
-            ],
-            output_names=["dhcp_files"],
-            function=dhcp_pipeline,
-        ),
-        name="dhcp_seg",
-    )
-
-    if "general" in params.keys():
-        dhcp_seg.inputs.pre_command = params["general"].get("pre_command", "")
-        dhcp_seg.inputs.dhcp_image = params["general"].get("dhcp_image", "")
-
-    if "dhcp" in params.keys():
-        dhcp_seg.inputs.threads = params["dhcp"].get("threads", "")
-        dhcp_seg.inputs.flag = flag
-
-    full_fet_pipe.connect(inputnode, "T2", dhcp_seg, "T2")
-    full_fet_pipe.connect(inputnode, "mask", dhcp_seg, "mask")
-
-    full_fet_pipe.connect(
-        inputnode, "gestational_age", dhcp_seg, "gestational_age"
-    )
-
-    # OUTPUT
-    outputnode = pe.Node(
-        niu.IdentityInterface(fields=["dhcp_files"]), name="outputnode"
-    )
-
-    full_fet_pipe.connect(dhcp_seg, "dhcp_files", outputnode, "dhcp_files")
+    full_fet_pipe.connect(dhcp_seg, "output_dir", outputnode, "output_dir")
 
     return full_fet_pipe

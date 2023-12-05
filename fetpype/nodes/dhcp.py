@@ -12,91 +12,153 @@ https://hub.docker.com/r/gerardmartijuan/dhcp-pipeline-multifact
 TODO: specify the changes from one version to another.
 """
 
+import os
+from nipype.interfaces.base import (
+    BaseInterfaceInputSpec,
+    TraitedSpec,
+    File,
+    Directory,
+    traits,
+    SimpleInterface,
+    BaseInterface,
+)
+import shutil
 
-def dhcp_pipeline(
-    T2,
-    mask,
-    gestational_age,
-    pre_command="",
-    dhcp_image="",
-    threads=1,
-    flag="all",
-):
+class DHCPInputSpec(BaseInterfaceInputSpec):
+    """
+    Input specification for the DHCP pipeline.
+
+    Attributes
+    ----------
+    T2 : File
+        Input T2 image.
+    mask : File
+        Input brain mask.
+    gestational_age : float
+        Gestational age in weeks.
+    pre_command : str
+        Pre-command for running the pipeline.
+    dhcp_image : str
+        Docker or Singularity image for the pipeline.
+    threads : int, optional
+        Number of threads for running the pipeline. Defaults to the system default.
+    flag : str, optional
+        Flags for running the pipeline. Defaults to an empty string.
+    """
+    T2 = File(exists=True, desc="Input T2 image", mandatory=True)
+    mask = File(exists=True, desc="Input brain mask", mandatory=True)
+    gestational_age = traits.Float(
+        desc="Gestational age in weeks", mandatory=True
+    )
+    pre_command = traits.Str(
+        desc="Pre-command for running the pipeline", mandatory=True
+    )
+    dhcp_image = traits.Str(
+        desc="Docker or Singularity image for the pipeline", mandatory=True
+    )
+    threads = traits.Int(
+        desc="Number of threads for running the pipeline", usedefault=True
+    )
+    flag = traits.Str(
+        desc="Flags for running the pipeline", usedefault=True
+    )
+
+
+class DHCPOutputSpec(TraitedSpec):
+    """
+    Specifies the output of the DHCP pipeline.
+
+    Attributes:
+        output_dir (str): The output directory of the DHCP pipeline.
+
+    TODO: Specify the outputs better? or just leave it as it is?
+    """
+    output_dir = Directory(
+        exists=True, desc="Output directory of the dhcp pipeline"
+    )
+
+    output_seg_all_labels = File(
+        exists=True, desc="Output segmentation of all labels"
+    )
+
+    output_surf_
+class dhcp_node(BaseInterface):
     """Run the dhcp segmentation pipeline on a single subject.
     The script needs to create the output folders and put the mask
     there so that the docker image can find it and doesn't run bet.
-    TODO: don't do it that convoluted.
-    TODO: Be able to input the number of threads
-
-    # Flags can be either "-all", "-seg", or "-surf"
     """
-    import os
-    import shutil
 
-    output_dir = os.path.abspath("dhcp_output")
-    os.makedirs(output_dir, exist_ok=True)
+    input_spec = DHCPInputSpec
+    output_spec = DHCPOutputSpec
 
-    # Basename of the T2 file
-    recon_file_name = os.path.basename(T2)
+    def _run_interface(self, runtime):
 
-    # Copy T2 to output dir
-    shutil.copyfile(T2, os.path.join(output_dir, recon_file_name))
+        output_dir = os.path.abspath("dhcp_output")
+        os.makedirs(output_dir, exist_ok=True)
 
-    # Copy mask to output dir with the correct name
-    os.makedirs(os.path.join(output_dir, "segmentations"), exist_ok=True)
+        # Basename of the T2 file
+        recon_file_name = os.path.basename(self.inputs.T2)
 
-    # check if mask file exists. If not, create it
-    shutil.copyfile(
-        mask,
-        os.path.join(
-            output_dir,
-            "segmentations",
-            f"{recon_file_name.replace('.nii.gz', '')}_brain_mask.nii.gz",
-        ),
-    )
-
-    if "docker" in pre_command:
-        cmd = pre_command
-        cmd += (
-            f"-v {output_dir}:/data "
-            f"{dhcp_image} "
-            f"/data/{recon_file_name} "
-            f"{gestational_age} "
-            "-data-dir /data "
-            f"-t {threads} "
-            "-c 0 "
-            f"{flag} "
+        # Copy T2 to output dir
+        shutil.copyfile(
+            self.inputs.T2, os.path.join(output_dir, recon_file_name)
         )
 
-    elif "singularity" in pre_command:
-        # Do we need FSL for this pipeline? add in the precommand
-        cmd = pre_command + dhcp_image
-        cmd += (
-            f"/usr/local/src/structural-pipeline/fetal-pipeline.sh "
-            f"{T2} "
-            f"{gestational_age} "
-            f"-data-dir "
-            f"{output_dir} "
-            f"-t {threads} "
-            "-c 0 "
-            f"{flag} "
+        # Copy mask to output dir with the correct name
+        os.makedirs(
+            os.path.join(output_dir, "segmentations"), exist_ok=True
         )
 
-    else:
-        raise ValueError(
-            "pre_command must either contain docker or singularity."
+        # check if mask file exists. If not, create it
+        shutil.copyfile(
+            self.inputs.mask,
+            os.path.join(
+                output_dir,
+                "segmentations",
+                f"{recon_file_name.replace('.nii.gz', '')}_brain_mask.nii.gz",
+            ),
         )
 
-    print(cmd)
-    os.system(cmd)
+        if "docker" in self.inputs.pre_command:
+            cmd = self.inputs.pre_command
+            cmd += (
+                f"-v {output_dir}:/data "
+                f"{self.inputs.dhcp_image} "
+                f"/data/{recon_file_name} "
+                f"{self.inputs.gestational_age} "
+                "-data-dir /data "
+                f"-t {self.inputs.threads} "
+                "-c 0 "
+                f"{self.inputs.flag} "
+            )
 
-    # assert if the output files exist
-    assert os.path.exists(
-        os.path.join(
-            output_dir,
-            "segmentations",
-            f"{recon_file_name.replace('.nii.gz', '')}_all_labels.nii.gz",
-        )
-    ), "Error, segmentations file does not exist"
+        elif "singularity" in self.inputs.pre_command:
+            # Do we need FSL for this pipeline? add in the precommand
+            cmd = self.inputs.pre_command + self.inputs.dhcp_image
+            cmd += (
+                f"/usr/local/src/structural-pipeline/fetal-pipeline.sh "
+                f"{self.inputs.T2} "
+                f"{self.inputs.gestational_age} "
+                f"-data-dir "
+                f"{output_dir} "
+                f"-t {self.inputs.threads} "
+                "-c 0 "
+                f"{self.inputs.flag} "
+            )
 
-    return output_dir
+        else:
+            raise ValueError(
+                "pre_command must either contain docker or singularity."
+            )
+
+        # Add code here to execute the dhcp pipeline using the cmd variable
+
+        print(cmd)
+        # os.system(cmd)
+
+        return runtime
+
+    def _list_outputs(self):
+        outputs = {}
+        outputs["output_dir"] = os.path.abspath("dhcp_output")
+        return outputs
