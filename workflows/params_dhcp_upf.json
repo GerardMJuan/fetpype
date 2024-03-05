@@ -8,6 +8,7 @@
     "dhcp": {
         "seg": true,
         "surf": true,
-        "threads": 4
+        "threads": 4,
+        "derivative": "recon_baseline"
     }
 }
