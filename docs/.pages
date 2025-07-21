@@ -1,0 +1,22 @@
+nav:
+    - Home: index.md
+    - In-depth:
+        - configs.md
+        - output_data.md
+        - run_parts.md
+        - contributing.md
+    - Pipeline:
+        - preprocessing.md
+        - reconstruction.md
+        - segmentation.md
+        - surface.md
+    - API:
+        - api_nodes.md
+        - api_pipelines.md
+        - api_utils.md
+        - api_workflows.md
+        
+        
+
+
+   
